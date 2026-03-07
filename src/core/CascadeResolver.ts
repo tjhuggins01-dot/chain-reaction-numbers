@@ -58,7 +58,7 @@ export function resolveLocalCascades(
     steps.push({ board: currentBoard, scoreDelta: resolved.score, depth });
 
     pivot = resolved.pivot;
-    currentPath = findLocalCascadePath(currentBoard, pivot, rules);
+    currentPath = findLocalCascadePath(currentBoard, pivot);
     depth += 1;
   }
 

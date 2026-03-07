@@ -42,7 +42,7 @@ export function hasAnyValidMove(board: BoardState, rules: RuleSet): boolean {
   return false;
 }
 
-export function findLocalCascadePath(board: BoardState, pivot: Position, rules: RuleSet): Position[] | null {
+export function findLocalCascadePath(board: BoardState, pivot: Position): Position[] | null {
   const pivotTile = getTile(board, pivot);
   if (!pivotTile) return null;
 
