@@ -8,13 +8,21 @@ import { calculateStepScore } from './Scoring';
 import type { SpawnPolicy } from './SpawnPolicy';
 import type { Rng } from './Rng';
 
-interface CascadeStep {
+export interface CascadeStep {
   board: BoardState;
   scoreDelta: number;
   depth: number;
+  removedValues: number[];
+  upgradedValue: number;
+  pivot: Position;
 }
 
-function resolveSingle(board: BoardState, path: Position[], rules: RuleSet, depth: number): { board: BoardState; score: number; pivot: Position } {
+function resolveSingle(
+  board: BoardState,
+  path: Position[],
+  rules: RuleSet,
+  depth: number,
+): { board: BoardState; score: number; pivot: Position; removedValues: number[]; upgradedValue: number } {
   const values: number[] = [];
   const pivot = path[path.length - 1];
   const tiles = board.tiles.map((row) => row.map((t) => ({ ...t, position: { ...t.position }, effects: [...t.effects] })));
@@ -33,9 +41,10 @@ function resolveSingle(board: BoardState, path: Position[], rules: RuleSet, dept
     effects: [],
     position: { ...pivot },
   };
+  const upgradedValue = tiles[pivot.y][pivot.x].value;
 
   const score = calculateStepScore(values, depth, rules);
-  return { board: { width: board.width, height: board.height, tiles }, score, pivot };
+  return { board: { width: board.width, height: board.height, tiles }, score, pivot, removedValues: values, upgradedValue };
 }
 
 export function resolveLocalCascades(
@@ -55,7 +64,14 @@ export function resolveLocalCascades(
     const resolved = resolveSingle(currentBoard, currentPath, rules, depth);
     currentBoard = applyGravity(resolved.board);
     currentBoard = refillBoard(currentBoard, rules, spawnPolicy, rng);
-    steps.push({ board: currentBoard, scoreDelta: resolved.score, depth });
+    steps.push({
+      board: currentBoard,
+      scoreDelta: resolved.score,
+      depth,
+      removedValues: resolved.removedValues,
+      upgradedValue: resolved.upgradedValue,
+      pivot: resolved.pivot,
+    });
 
     pivot = resolved.pivot;
     currentPath = findLocalCascadePath(currentBoard, pivot);

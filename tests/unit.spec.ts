@@ -7,7 +7,7 @@ import { refillBoard } from '../src/core/RefillResolver';
 import { SeededRng } from '../src/core/Rng';
 import { WeightedSpawnPolicy } from '../src/core/SpawnPolicy';
 import { calculateStepScore } from '../src/core/Scoring';
-import { hasAnyValidMove } from '../src/core/MoveScanner';
+import { findAnyValidPath, findLocalCascadePath, hasAnyValidMove } from '../src/core/MoveScanner';
 import { GameEngine } from '../src/core/GameEngine';
 import { endlessMode } from '../src/modes/EndlessMode';
 
@@ -67,6 +67,25 @@ describe('resolvers and scoring', () => {
   test('score calculation', () => {
     expect(calculateStepScore([1, 2, 3], 0, defaultRuleSet)).toBe(6);
   });
+
+  test('upgraded tile placement and event payload fidelity', () => {
+    const engine = GameEngine.create(101, defaultRuleSet, endlessMode);
+    engine.dispatch({ type: 'StartRun' });
+    const state = engine.getState();
+    const path = findAnyValidPath(state.board, state.rules);
+    expect(path).not.toBeNull();
+    if (!path) return;
+
+    const last = path[path.length - 1];
+    const lastValue = state.board.tiles[last.y][last.x].value;
+    const events = engine.dispatch({ type: 'CommitPath', path });
+    const resolved = events.find((e) => e.type === 'ChainResolved');
+    expect(resolved?.type).toBe('ChainResolved');
+    if (!resolved || resolved.type !== 'ChainResolved') return;
+
+    expect(resolved.removedValues).toEqual(path.map((p) => state.board.tiles[p.y][p.x].value));
+    expect(resolved.upgradedValue).toBe(Math.min(lastValue + 1, defaultRuleSet.maxTileValue));
+  });
 });
 
 describe('engine behavior', () => {
@@ -86,18 +105,28 @@ describe('engine behavior', () => {
     engineB.dispatch({ type: 'StartRun' });
 
     const state = engineA.getState();
-    const path = [
-      { x: 0, y: 0 },
-      { x: 1, y: 0 },
-      { x: 2, y: 0 },
-    ];
-    const maybe = validatePath(state.board, path, defaultRuleSet);
-    if (maybe.valid) {
+    const path = findAnyValidPath(state.board, defaultRuleSet);
+    if (path) {
       engineA.dispatch({ type: 'CommitPath', path });
       engineB.dispatch({ type: 'CommitPath', path });
     }
 
     expect(engineA.getState()).toEqual(engineB.getState());
     expect(engineA.getReplayLog().initialSeed).toBe(100);
+    expect(engineA.getReplayLog().commands[0]?.type).toBe('StartRun');
+  });
+
+  test('local cascade discovery can find paths ending at pivot', () => {
+    const board = boardFromValues([
+      [1, 2, 3],
+      [2, 3, 4],
+      [3, 4, 5],
+    ]);
+
+    const path = findLocalCascadePath(board, { x: 2, y: 2 });
+    expect(path).not.toBeNull();
+    if (!path) return;
+    expect(path[path.length - 1]).toEqual({ x: 2, y: 2 });
+    expect(path.length).toBeGreaterThanOrEqual(defaultRuleSet.minChainLength);
   });
 });

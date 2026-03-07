@@ -52,21 +52,23 @@ export class GameEngine {
 
   dispatch(command: EngineCommand): EngineEvent[] {
     const events: EngineEvent[] = [];
-    this.replay.commands.push(command);
 
     switch (command.type) {
       case 'StartRun': {
         this.resetInternal(command.seed ?? this.state.seed);
+        this.replay.commands.push(command);
         events.push({ type: 'RunStarted', seed: this.state.seed, board: this.getState().board });
         break;
       }
       case 'ResetRun': {
         const seed = command.keepSeed ? this.state.seed : command.seed ?? (Math.floor(Math.random() * 1_000_000) + 1);
         this.resetInternal(seed);
+        this.replay.commands.push(command);
         events.push({ type: 'RunStarted', seed: this.state.seed, board: this.getState().board });
         break;
       }
       case 'CommitPath': {
+        this.replay.commands.push(command);
         if (!this.state.runActive) {
           events.push({ type: 'InvalidPathRejected', reason: 'run_inactive' });
           break;
@@ -84,7 +86,12 @@ export class GameEngine {
         for (const step of resolved.steps) {
           totalDelta += step.scoreDelta;
           this.state.cascadeDepth = step.depth;
-          events.push({ type: 'ChainResolved', removedValues: [], upgradedValue: 0, cascadeDepth: step.depth });
+          events.push({
+            type: 'ChainResolved',
+            removedValues: step.removedValues,
+            upgradedValue: step.upgradedValue,
+            cascadeDepth: step.depth,
+          });
           if (step.depth > 0) events.push({ type: 'CascadeTriggered', depth: step.depth });
           events.push({ type: 'GravityApplied' });
           events.push({ type: 'BoardRefilled' });
@@ -100,10 +107,12 @@ export class GameEngine {
         break;
       }
       case 'ReviveRun': {
+        this.replay.commands.push(command);
         events.push({ type: 'InvalidPathRejected', reason: 'not_implemented' });
         break;
       }
       case 'ApplyPowerUp': {
+        this.replay.commands.push(command);
         events.push({ type: 'InvalidPathRejected', reason: 'not_implemented' });
         break;
       }
