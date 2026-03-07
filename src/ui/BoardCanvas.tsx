@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type PointerEvent } from 'react';
 import type { BoardState } from '../core/BoardState';
 import type { Position } from '../core/Position';
 import { mapCanvasPointToCell } from '../app/InputMapper';
+import { isAdjacent } from '../core/Position';
 
 interface Props {
   board: BoardState;
@@ -72,6 +73,10 @@ export function BoardCanvas({ board, selectedPath, onPathChange, onCommit }: Pro
     return mapCanvasPointToCell(x, y, rect.width, rect.height, board.width, board.height);
   }
 
+  function tileValueAt(pos: Position): number {
+    return board.tiles[pos.y]?.[pos.x]?.value ?? 0;
+  }
+
   return (
     <canvas
       ref={ref}
@@ -91,6 +96,8 @@ export function BoardCanvas({ board, selectedPath, onPathChange, onCommit }: Pro
         const last = selectedPath[selectedPath.length - 1];
         if (last && last.x === cell.x && last.y === cell.y) return;
         if (selectedPath.some((p) => p.x === cell.x && p.y === cell.y)) return;
+        if (last && !isAdjacent(last, cell)) return;
+        if (last && tileValueAt(cell) !== tileValueAt(last) + 1) return;
         onPathChange([...selectedPath, cell]);
       }}
       onPointerUp={() => {
