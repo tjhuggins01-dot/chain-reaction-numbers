@@ -1,6 +1,6 @@
 import { hasAnyValidMove } from '../core/MoveScanner';
 import type { GameState } from '../core/GameState';
-import type { GameMode } from './GameMode';
+import type { GameMode } from '../core/GameMode';
 
 export const endlessMode: GameMode = {
   id: 'endless',
