@@ -24,6 +24,11 @@ describe('path validation', () => {
     expect(result.reason).toBe('not_adjacent');
   });
 
+  test('valid adjacent ascending path is accepted', () => {
+    const result = validatePath(board, [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 2, y: 0 }], defaultRuleSet);
+    expect(result.valid).toBe(true);
+  });
+
   test('ascending validation', () => {
     const result = validatePath(board, [{ x: 0, y: 0 }, { x: 1, y: 1 }, { x: 2, y: 2 }], defaultRuleSet);
     expect(result.valid).toBe(false);
@@ -62,6 +67,7 @@ describe('resolvers and scoring', () => {
     const a = refillBoard(board, defaultRuleSet, p, new SeededRng(42));
     const b = refillBoard(board, defaultRuleSet, p, new SeededRng(42));
     expect(a.tiles.map((r) => r.map((t) => t.value))).toEqual(b.tiles.map((r) => r.map((t) => t.value)));
+    expect(a.tiles.every((row) => row.every((tile) => tile.value >= 1 && tile.value <= defaultRuleSet.maxTileValue))).toBe(true);
   });
 
   test('score calculation', () => {
@@ -85,6 +91,20 @@ describe('resolvers and scoring', () => {
 
     expect(resolved.removedValues).toEqual(path.map((p) => state.board.tiles[p.y][p.x].value));
     expect(resolved.upgradedValue).toBe(Math.min(lastValue + 1, defaultRuleSet.maxTileValue));
+  });
+
+  test('invalid path does not mutate board or score', () => {
+    const engine = GameEngine.create(222, defaultRuleSet, endlessMode);
+    engine.dispatch({ type: 'StartRun' });
+    const before = engine.getState();
+
+    const events = engine.dispatch({
+      type: 'CommitPath',
+      path: [{ x: 0, y: 0 }, { x: 5, y: 5 }, { x: 4, y: 4 }],
+    });
+
+    expect(events.some((event) => event.type === 'InvalidPathRejected')).toBe(true);
+    expect(engine.getState()).toEqual(before);
   });
 });
 
@@ -116,6 +136,16 @@ describe('engine behavior', () => {
     expect(engineA.getReplayLog().commands[0]?.type).toBe('StartRun');
   });
 
+  test('seeded initialization is deterministic', () => {
+    const engineA = GameEngine.create(321, defaultRuleSet, endlessMode);
+    const engineB = GameEngine.create(321, defaultRuleSet, endlessMode);
+
+    engineA.dispatch({ type: 'StartRun' });
+    engineB.dispatch({ type: 'StartRun' });
+
+    expect(engineA.getState().board).toEqual(engineB.getState().board);
+  });
+
   test('local cascade discovery can find paths ending at pivot', () => {
     const board = boardFromValues([
       [1, 2, 3],
@@ -123,7 +153,7 @@ describe('engine behavior', () => {
       [3, 4, 5],
     ]);
 
-    const path = findLocalCascadePath(board, { x: 2, y: 2 });
+    const path = findLocalCascadePath(board, { x: 2, y: 2 }, defaultRuleSet);
     expect(path).not.toBeNull();
     if (!path) return;
     expect(path[path.length - 1]).toEqual({ x: 2, y: 2 });

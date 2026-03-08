@@ -74,7 +74,7 @@ export function resolveLocalCascades(
     });
 
     pivot = resolved.pivot;
-    currentPath = findLocalCascadePath(currentBoard, pivot);
+    currentPath = findLocalCascadePath(currentBoard, pivot, rules);
     depth += 1;
   }
 

@@ -19,7 +19,7 @@ function neighbors(board: BoardState, pos: Position): Position[] {
 function dfs(board: BoardState, current: Position, length: number, seen: Set<string>, rules: RuleSet): boolean {
   if (length >= rules.minChainLength) return true;
   const currentTile = getTile(board, current);
-  if (!currentTile) return false;
+  if (!currentTile || currentTile.value <= 0 || currentTile.value > rules.maxTileValue) return false;
   for (const next of neighbors(board, current)) {
     const key = positionKey(next);
     if (seen.has(key)) continue;
@@ -41,7 +41,7 @@ function dfsPath(
 ): Position[] | null {
   if (path.length >= rules.minChainLength) return [...path];
   const currentTile = getTile(board, current);
-  if (!currentTile) return null;
+  if (!currentTile || currentTile.value <= 0 || currentTile.value > rules.maxTileValue) return null;
 
   for (const next of neighbors(board, current)) {
     const key = positionKey(next);
@@ -63,6 +63,8 @@ export function hasAnyValidMove(board: BoardState, rules: RuleSet): boolean {
   for (let y = 0; y < board.height; y += 1) {
     for (let x = 0; x < board.width; x += 1) {
       const start = { x, y };
+      const startTile = getTile(board, start);
+      if (!startTile || startTile.value <= 0 || startTile.value > rules.maxTileValue) continue;
       if (dfs(board, start, 1, new Set([positionKey(start)]), rules)) return true;
     }
   }
@@ -73,6 +75,8 @@ export function findAnyValidPath(board: BoardState, rules: RuleSet): Position[] 
   for (let y = 0; y < board.height; y += 1) {
     for (let x = 0; x < board.width; x += 1) {
       const start = { x, y };
+      const startTile = getTile(board, start);
+      if (!startTile || startTile.value <= 0 || startTile.value > rules.maxTileValue) continue;
       const key = positionKey(start);
       const found = dfsPath(board, start, new Set([key]), [start], rules);
       if (found) return found;
@@ -81,9 +85,9 @@ export function findAnyValidPath(board: BoardState, rules: RuleSet): Position[] 
   return null;
 }
 
-export function findLocalCascadePath(board: BoardState, pivot: Position): Position[] | null {
+export function findLocalCascadePath(board: BoardState, pivot: Position, rules: RuleSet): Position[] | null {
   const pivotTile = getTile(board, pivot);
-  if (!pivotTile) return null;
+  if (!pivotTile || pivotTile.value <= 0 || pivotTile.value > rules.maxTileValue) return null;
 
   interface Step {
     pos: Position;
@@ -99,7 +103,7 @@ export function findLocalCascadePath(board: BoardState, pivot: Position): Positi
     const tile = getTile(board, step.pos);
     if (!tile) continue;
 
-    if (step.path.length >= 3) {
+    if (step.path.length >= rules.minChainLength) {
       const reversed = [...step.path].reverse();
       return reversed;
     }

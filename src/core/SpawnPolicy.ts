@@ -9,8 +9,11 @@ export class WeightedSpawnPolicy implements SpawnPolicy {
   nextValue(rng: Rng, rules: RuleSet): number {
     const entries = Object.entries(rules.spawnWeights)
       .map(([k, w]) => ({ value: Number(k), weight: w }))
-      .filter((x) => x.weight > 0)
+      .filter((x) => x.weight > 0 && x.value >= 1 && x.value <= rules.maxTileValue)
       .sort((a, b) => a.value - b.value);
+
+    if (entries.length === 0) return 1;
+
     const total = entries.reduce((sum, item) => sum + item.weight, 0);
     let threshold = rng.nextFloat() * total;
     for (const entry of entries) {
