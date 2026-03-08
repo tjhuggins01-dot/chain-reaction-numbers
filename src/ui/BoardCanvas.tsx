@@ -14,8 +14,10 @@ interface Props {
 }
 
 const maxCanvasSize = 520;
-const minCanvasSize = 180;
+const minCanvasSize = 140;
 const reservedVerticalSpace = 300;
+const horizontalBoundary = 32;
+const verticalBoundary = 16;
 
 function colorForValue(value: number): string {
   const palette = ['#111827', '#1d4ed8', '#059669', '#ca8a04', '#ea580c', '#dc2626', '#9333ea', '#0f766e', '#7c3aed', '#be123c', '#334155'];
@@ -31,10 +33,11 @@ export function BoardCanvas({ board, minPathLength, inputEnabled, selectedPath, 
 
   useEffect(() => {
     const updateSize = () => {
-      const viewportWidth = Math.floor(window.innerWidth - 24);
-      const viewportHeight = Math.floor(window.innerHeight - reservedVerticalSpace);
+      const viewportWidth = Math.floor(window.innerWidth - horizontalBoundary);
+      const viewportHeight = Math.floor(window.innerHeight - reservedVerticalSpace - verticalBoundary);
       const next = Math.min(maxCanvasSize, viewportWidth, viewportHeight);
-      setDisplaySize(Math.max(minCanvasSize, next));
+      const minimumSafeSize = Math.min(minCanvasSize, viewportWidth);
+      setDisplaySize(Math.max(minimumSafeSize, next));
     };
 
     updateSize();
@@ -162,7 +165,7 @@ export function BoardCanvas({ board, minPathLength, inputEnabled, selectedPath, 
   }, [inputEnabled, onPathChange]);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', paddingInline: horizontalBoundary / 2, boxSizing: 'border-box' }}>
       <canvas
         ref={ref}
         style={{
