@@ -8,7 +8,7 @@ import { WeightedSpawnPolicy } from './SpawnPolicy';
 import { validatePath } from './PathValidator';
 import { refillBoard } from './RefillResolver';
 import { resolveLocalCascades } from './CascadeResolver';
-import type { GameMode } from '../modes/GameMode';
+import type { GameMode } from './GameMode';
 
 function buildEmptyBoard(rules: RuleSet) {
   return {
