@@ -14,7 +14,8 @@ interface Props {
 }
 
 const maxCanvasSize = 520;
-const minCanvasSize = 280;
+const minCanvasSize = 180;
+const reservedVerticalSpace = 300;
 
 function colorForValue(value: number): string {
   const palette = ['#111827', '#1d4ed8', '#059669', '#ca8a04', '#ea580c', '#dc2626', '#9333ea', '#0f766e', '#7c3aed', '#be123c', '#334155'];
@@ -30,8 +31,10 @@ export function BoardCanvas({ board, minPathLength, inputEnabled, selectedPath, 
 
   useEffect(() => {
     const updateSize = () => {
-      const viewportWidth = Math.max(minCanvasSize, Math.floor(window.innerWidth - 32));
-      setDisplaySize(Math.max(minCanvasSize, Math.min(maxCanvasSize, viewportWidth)));
+      const viewportWidth = Math.floor(window.innerWidth - 24);
+      const viewportHeight = Math.floor(window.innerHeight - reservedVerticalSpace);
+      const next = Math.min(maxCanvasSize, viewportWidth, viewportHeight);
+      setDisplaySize(Math.max(minCanvasSize, next));
     };
 
     updateSize();
@@ -159,7 +162,7 @@ export function BoardCanvas({ board, minPathLength, inputEnabled, selectedPath, 
   }, [inputEnabled, onPathChange]);
 
   return (
-    <div>
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
       <canvas
         ref={ref}
         style={{
@@ -204,7 +207,7 @@ export function BoardCanvas({ board, minPathLength, inputEnabled, selectedPath, 
           onPathChange([]);
         }}
       />
-      <div style={{ display: 'flex', gap: 8, marginTop: 8, alignItems: 'center' }}>
+      <div style={{ display: 'flex', gap: 8, marginTop: 8, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center' }}>
         <button type="button" onClick={() => onPathChange([])} disabled={selectedPath.length === 0 || !inputEnabled}>
           Cancel Selection
         </button>
