@@ -56,15 +56,16 @@ export class GameEngine {
 
     switch (command.type) {
       case 'StartRun': {
-        this.resetInternal(command.seed ?? this.state.seed);
-        this.replay.commands.push(command);
+        const seed = command.seed ?? this.state.seed;
+        this.resetInternal(seed);
+        this.replay.commands.push({ type: 'StartRun', seed: this.state.seed });
         events.push({ type: 'RunStarted', seed: this.state.seed, board: this.getState().board });
         break;
       }
       case 'ResetRun': {
         const seed = command.keepSeed ? this.state.seed : command.seed ?? (Math.floor(Math.random() * 1_000_000) + 1);
         this.resetInternal(seed);
-        this.replay.commands.push(command);
+        this.replay.commands.push({ type: 'ResetRun', seed: this.state.seed, keepSeed: command.keepSeed });
         events.push({ type: 'RunStarted', seed: this.state.seed, board: this.getState().board });
         break;
       }
