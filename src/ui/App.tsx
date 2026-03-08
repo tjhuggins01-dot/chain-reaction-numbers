@@ -6,6 +6,7 @@ import { BoardCanvas } from './BoardCanvas';
 import { Hud } from './Hud';
 import { GameOverModal } from './GameOverModal';
 import { DebugPanel } from './DebugPanel';
+import { shouldCommitPath } from '../app/UiGuards';
 
 export function App(): JSX.Element {
   const session = useMemo(() => new GameSession(Date.now() % 1000000), []);
@@ -23,15 +24,27 @@ export function App(): JSX.Element {
   const refresh = () => setVersion((v) => v + 1);
 
   return (
-    <main style={{ maxWidth: 520, margin: '20px auto', fontFamily: 'Inter, system-ui, sans-serif' }}>
+    <main style={{ maxWidth: 560, margin: '12px auto', padding: '0 12px', fontFamily: 'Inter, system-ui, sans-serif' }}>
       <h1>Chain Reaction Numbers</h1>
-      <Hud score={state.score} cascadeDepth={state.cascadeDepth} onReset={() => { session.controller.send({ type: 'ResetRun' }); refresh(); }} />
+      <Hud
+        score={state.score}
+        cascadeDepth={state.cascadeDepth}
+        modeName="Endless"
+        isGameOver={!state.runActive}
+        onReset={() => {
+          session.controller.send({ type: 'ResetRun' });
+          setPath([]);
+          refresh();
+        }}
+      />
       <BoardCanvas
         board={state.board}
+        minPathLength={state.rules.minChainLength}
+        inputEnabled={state.runActive}
         selectedPath={path}
         onPathChange={setPath}
         onCommit={(p) => {
-          if (p.length > 0) {
+          if (shouldCommitPath(p, state.runActive, state.rules.minChainLength)) {
             session.controller.send({ type: 'CommitPath', path: p });
             refresh();
           }
@@ -42,6 +55,7 @@ export function App(): JSX.Element {
         score={state.score}
         onReset={() => {
           session.controller.send({ type: 'ResetRun' });
+          setPath([]);
           refresh();
         }}
       />
