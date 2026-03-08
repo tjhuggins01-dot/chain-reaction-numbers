@@ -160,6 +160,7 @@ export function App(): JSX.Element {
         popProgress={popProgress}
         minPathLength={engineState.rules.minChainLength}
         inputEnabled={engineState.runActive && !resolving}
+        resolving={resolving}
         selectedPath={path}
         removingCells={removingCells}
         upgradedCell={upgradedCell}

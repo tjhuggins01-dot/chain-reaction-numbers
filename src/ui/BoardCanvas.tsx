@@ -11,6 +11,7 @@ interface Props {
   popProgress: number;
   minPathLength: number;
   inputEnabled: boolean;
+  resolving: boolean;
   selectedPath: Position[];
   removingCells: Position[];
   upgradedCell: Position | null;
@@ -44,6 +45,7 @@ export function BoardCanvas({
   popProgress,
   minPathLength,
   inputEnabled,
+  resolving,
   selectedPath,
   removingCells,
   upgradedCell,
@@ -269,7 +271,7 @@ export function BoardCanvas({
           touchAction: 'none',
           display: 'block',
           cursor: inputEnabled ? 'pointer' : 'not-allowed',
-          opacity: inputEnabled ? 1 : 0.7,
+          opacity: !inputEnabled && !resolving ? 0.7 : 1,
           userSelect: 'none',
           WebkitUserSelect: 'none',
         }}
@@ -319,7 +321,7 @@ export function BoardCanvas({
         >
           Commit Path
         </button>
-        <span style={{ fontSize: 12, color: '#475569' }}>{inputEnabled ? `Path: ${selectedPath.length} cells` : 'Input disabled: resolving'}</span>
+        <span style={{ fontSize: 12, color: '#475569' }}>{inputEnabled ? `Path: ${selectedPath.length} cells` : resolving ? 'Input disabled: resolving' : 'Input disabled: run ended'}</span>
       </div>
     </div>
   );
