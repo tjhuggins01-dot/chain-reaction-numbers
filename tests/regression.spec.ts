@@ -55,7 +55,15 @@ describe('engine integration and regression safety', () => {
     const engine = createEngineWithBoard(board, rules, 10);
     const events = engine.dispatch({ type: 'CommitPath', path: [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 2, y: 0 }] });
 
-    expect(events.filter((event) => event.type === 'ChainResolved')).toHaveLength(1);
+    const chainEvents = events.filter((event) => event.type === 'ChainResolved');
+    expect(chainEvents).toHaveLength(1);
+    const chain = chainEvents[0];
+    expect(chain.removedPositions).toEqual([{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 2, y: 0 }]);
+    expect(chain.upgradedPosition).toEqual({ x: 2, y: 0 });
+
+    const refillEvents = events.filter((event) => event.type === 'BoardRefilled');
+    expect(refillEvents).toHaveLength(1);
+    expect(refillEvents[0].cascadeDepth).toBe(0);
     expect(engine.getState().score).toBe(calculateStepScore([1, 2, 3], 0, rules));
     expect(boardValues(engine.getState().board)).toEqual([
       [1, 1, 4],

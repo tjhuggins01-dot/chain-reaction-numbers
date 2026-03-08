@@ -6,9 +6,13 @@ import { getExtendedPath } from '../app/PathSelection';
 
 interface Props {
   board: BoardState;
+  previousBoard: BoardState | null;
+  fallProgress: number;
   minPathLength: number;
   inputEnabled: boolean;
   selectedPath: Position[];
+  removingCells: Position[];
+  upgradedCell: Position | null;
   onPathChange(path: Position[]): void;
   onCommit(path: Position[]): void;
 }
@@ -20,16 +24,39 @@ const horizontalBoundary = 32;
 const verticalBoundary = 16;
 
 function colorForValue(value: number): string {
-  const palette = ['#111827', '#1d4ed8', '#059669', '#ca8a04', '#ea580c', '#dc2626', '#9333ea', '#0f766e', '#7c3aed', '#be123c', '#334155'];
-  return palette[value] ?? '#000';
+  const palette = ['#111827', '#2563eb', '#0f766e', '#a16207', '#c2410c', '#dc2626', '#9333ea', '#0f766e', '#6d28d9', '#be123c', '#334155'];
+  return palette[value] ?? '#111827';
 }
 
-export function BoardCanvas({ board, minPathLength, inputEnabled, selectedPath, onPathChange, onCommit }: Props): JSX.Element {
+function key(pos: Position): string {
+  return `${pos.x},${pos.y}`;
+}
+
+export function BoardCanvas({
+  board,
+  previousBoard,
+  fallProgress,
+  minPathLength,
+  inputEnabled,
+  selectedPath,
+  removingCells,
+  upgradedCell,
+  onPathChange,
+  onCommit,
+}: Props): JSX.Element {
   const ref = useRef<HTMLCanvasElement | null>(null);
   const [dragging, setDragging] = useState(false);
   const [displaySize, setDisplaySize] = useState(maxCanvasSize);
+  const [invalidCell, setInvalidCell] = useState<Position | null>(null);
 
-  const selectedSet = useMemo(() => new Set(selectedPath.map((p) => `${p.x},${p.y}`)), [selectedPath]);
+  const selectedSet = useMemo(() => new Set(selectedPath.map((p) => key(p))), [selectedPath]);
+  const removingSet = useMemo(() => new Set(removingCells.map((p) => key(p))), [removingCells]);
+
+  useEffect(() => {
+    if (!invalidCell) return;
+    const t = window.setTimeout(() => setInvalidCell(null), 120);
+    return () => window.clearTimeout(t);
+  }, [invalidCell]);
 
   useEffect(() => {
     const updateSize = () => {
@@ -65,26 +92,67 @@ export function BoardCanvas({ board, minPathLength, inputEnabled, selectedPath, 
     ctx.fillStyle = '#f8fafc';
     ctx.fillRect(0, 0, displaySize, displaySize);
 
+    const prevById = new Map<string, Position>();
+    if (previousBoard) {
+      for (let y = 0; y < previousBoard.height; y += 1) {
+        for (let x = 0; x < previousBoard.width; x += 1) {
+          prevById.set(previousBoard.tiles[y][x].id, { x, y });
+        }
+      }
+    }
+
     for (let y = 0; y < board.height; y += 1) {
       for (let x = 0; x < board.width; x += 1) {
         const tile = board.tiles[y][x];
-        const key = `${x},${y}`;
+        const tileKey = `${x},${y}`;
         const left = x * cellW;
         const top = y * cellH;
 
-        ctx.fillStyle = selectedSet.has(key) ? '#fef3c7' : '#e2e8f0';
+        const isSelected = selectedSet.has(tileKey);
+        const isRemoving = removingSet.has(tileKey);
+        const isUpgraded = upgradedCell && upgradedCell.x === x && upgradedCell.y === y;
+        const isInvalid = invalidCell && invalidCell.x === x && invalidCell.y === y;
+
+        ctx.fillStyle = isSelected ? '#fef3c7' : '#e2e8f0';
+        if (isInvalid) ctx.fillStyle = '#fee2e2';
         ctx.fillRect(left + 1, top + 1, cellW - 2, cellH - 2);
 
-        ctx.fillStyle = colorForValue(tile.value);
-        ctx.beginPath();
-        ctx.arc(left + cellW / 2, top + cellH / 2, Math.min(cellW, cellH) * 0.33, 0, Math.PI * 2);
-        ctx.fill();
+        if (tile.value > 0) {
+          let drawX = left + cellW / 2;
+          let drawY = top + cellH / 2;
+          if (fallProgress < 1) {
+            const prev = prevById.get(tile.id);
+            if (prev) {
+              const startX = prev.x * cellW + cellW / 2;
+              const startY = prev.y * cellH + cellH / 2;
+              drawX = startX + (drawX - startX) * fallProgress;
+              drawY = startY + (drawY - startY) * fallProgress;
+            }
+          }
 
-        ctx.fillStyle = '#ffffff';
-        ctx.font = `bold ${Math.max(14, Math.floor(cellW * 0.28))}px sans-serif`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(String(tile.value), left + cellW / 2, top + cellH / 2);
+          const removeScale = isRemoving ? Math.max(0, 1 - fallProgress) : 1;
+          const upgradedBoost = isUpgraded ? 1 + Math.max(0, 0.25 * (1 - fallProgress)) : 1;
+          const radius = Math.min(cellW, cellH) * 0.33 * removeScale * upgradedBoost;
+
+          ctx.fillStyle = colorForValue(tile.value);
+          ctx.beginPath();
+          ctx.arc(drawX, drawY, Math.max(0, radius), 0, Math.PI * 2);
+          ctx.fill();
+
+          if (isUpgraded) {
+            ctx.strokeStyle = '#f59e0b';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.arc(drawX, drawY, radius + 4, 0, Math.PI * 2);
+            ctx.stroke();
+          }
+
+          ctx.fillStyle = '#ffffff';
+          ctx.font = `bold ${Math.max(14, Math.floor(cellW * 0.31))}px sans-serif`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(String(tile.value), drawX, drawY);
+        }
       }
     }
 
@@ -135,7 +203,7 @@ export function BoardCanvas({ board, minPathLength, inputEnabled, selectedPath, 
         ctx.fillText(String(index + 1), cx, cy);
       });
     }
-  }, [board, displaySize, selectedPath, selectedSet]);
+  }, [board, displaySize, selectedPath, selectedSet, previousBoard, fallProgress, removingSet, upgradedCell, invalidCell]);
 
   function pointerToCell(e: PointerEvent<HTMLCanvasElement>): Position | null {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -145,7 +213,11 @@ export function BoardCanvas({ board, minPathLength, inputEnabled, selectedPath, 
   }
 
   function appendIfValid(next: Position) {
-    onPathChange(getExtendedPath(board, selectedPath, next));
+    const nextPath = getExtendedPath(board, selectedPath, next);
+    if (nextPath.length === selectedPath.length && key(next) !== key(selectedPath[selectedPath.length - 2] ?? next)) {
+      setInvalidCell(next);
+    }
+    onPathChange(nextPath);
   }
 
   function finishSelection() {
@@ -171,12 +243,12 @@ export function BoardCanvas({ board, minPathLength, inputEnabled, selectedPath, 
         style={{
           width: displaySize,
           height: displaySize,
-          border: '1px solid #64748b',
+          border: '2px solid #64748b',
           borderRadius: 8,
           touchAction: 'none',
           display: 'block',
           cursor: inputEnabled ? 'pointer' : 'not-allowed',
-          opacity: inputEnabled ? 1 : 0.65,
+          opacity: inputEnabled ? 1 : 0.7,
           userSelect: 'none',
           WebkitUserSelect: 'none',
         }}
@@ -226,9 +298,7 @@ export function BoardCanvas({ board, minPathLength, inputEnabled, selectedPath, 
         >
           Commit Path
         </button>
-        <span style={{ fontSize: 12, color: '#475569' }}>
-          {inputEnabled ? `Path: ${selectedPath.length} cells` : 'Input disabled: run ended'}
-        </span>
+        <span style={{ fontSize: 12, color: '#475569' }}>{inputEnabled ? `Path: ${selectedPath.length} cells` : 'Input disabled: resolving'}</span>
       </div>
     </div>
   );
