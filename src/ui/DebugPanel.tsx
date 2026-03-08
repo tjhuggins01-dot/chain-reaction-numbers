@@ -9,6 +9,7 @@ interface Props {
 
 export function DebugPanel({ seed, replay, onResetSameSeed, onResetNewSeed }: Props): JSX.Element {
   const replayJson = JSON.stringify(replay, null, 2);
+  const canCopy = typeof navigator !== 'undefined' && Boolean(navigator.clipboard?.writeText);
 
   return (
     <details style={{ marginTop: 12 }}>
@@ -20,6 +21,17 @@ export function DebugPanel({ seed, replay, onResetSameSeed, onResetNewSeed }: Pr
         <p>Replay bytes: {replayJson.length}</p>
         <button onClick={onResetSameSeed}>Reset Same Seed</button>
         <button onClick={onResetNewSeed} style={{ marginLeft: 8 }}>Reset New Seed</button>
+        <button
+          onClick={() => {
+            if (canCopy) {
+              navigator.clipboard.writeText(replayJson);
+            }
+          }}
+          style={{ marginLeft: 8 }}
+          disabled={!canCopy}
+        >
+          Copy Replay JSON
+        </button>
         <details style={{ marginTop: 8 }}>
           <summary>Replay export</summary>
           <textarea
