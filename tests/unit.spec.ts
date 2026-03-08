@@ -10,6 +10,11 @@ import { calculateStepScore } from '../src/core/Scoring';
 import { findAnyValidPath, findLocalCascadePath, hasAnyValidMove } from '../src/core/MoveScanner';
 import { GameEngine } from '../src/core/GameEngine';
 import { endlessMode } from '../src/modes/EndlessMode';
+import { resolveLocalCascades } from '../src/core/CascadeResolver';
+
+const fixedSpawnPolicy = {
+  nextValue: () => 10,
+};
 
 describe('path validation', () => {
   const board = boardFromValues([
@@ -146,7 +151,7 @@ describe('engine behavior', () => {
     expect(engineA.getState().board).toEqual(engineB.getState().board);
   });
 
-  test('local cascade discovery can find paths ending at pivot', () => {
+  test('local cascade discovery can find paths containing pivot', () => {
     const board = boardFromValues([
       [1, 2, 3],
       [2, 3, 4],
@@ -156,7 +161,127 @@ describe('engine behavior', () => {
     const path = findLocalCascadePath(board, { x: 2, y: 2 }, defaultRuleSet);
     expect(path).not.toBeNull();
     if (!path) return;
-    expect(path[path.length - 1]).toEqual({ x: 2, y: 2 });
+    expect(path.some((point) => point.x === 2 && point.y === 2)).toBe(true);
     expect(path.length).toBeGreaterThanOrEqual(defaultRuleSet.minChainLength);
+  });
+
+  test('local cascade tie-break prefers the longest path first', () => {
+    const board = boardFromValues([
+      [2, 3, 6],
+      [1, 4, 5],
+      [9, 9, 9],
+    ]);
+
+    const path = findLocalCascadePath(board, { x: 1, y: 1 }, defaultRuleSet);
+    expect(path).toEqual([
+      { x: 0, y: 1 },
+      { x: 0, y: 0 },
+      { x: 1, y: 0 },
+      { x: 1, y: 1 },
+      { x: 2, y: 1 },
+      { x: 2, y: 0 },
+    ]);
+  });
+
+  test('local cascade tie-break prefers lexicographically smallest coordinates when fully tied', () => {
+    const board = boardFromValues([
+      [6, 9, 6],
+      [5, 4, 5],
+      [9, 9, 9],
+    ]);
+
+    const path = findLocalCascadePath(board, { x: 1, y: 1 }, defaultRuleSet);
+    expect(path).toEqual([
+      { x: 1, y: 1 },
+      { x: 0, y: 1 },
+      { x: 0, y: 0 },
+    ]);
+  });
+});
+
+describe('local cascade resolution', () => {
+  test('does not cascade when no pivot-based follow-up exists', () => {
+    const board = boardFromValues([
+      [9, 9, 9, 9],
+      [1, 2, 3, 9],
+      [9, 9, 9, 9],
+      [9, 9, 9, 9],
+    ]);
+
+    const result = resolveLocalCascades(
+      board,
+      [{ x: 0, y: 1 }, { x: 1, y: 1 }, { x: 2, y: 1 }],
+      defaultRuleSet,
+      fixedSpawnPolicy,
+      new SeededRng(7),
+    );
+
+    expect(result.steps).toHaveLength(1);
+    expect(result.steps[0]?.depth).toBe(0);
+  });
+
+  test('single-step local cascade triggers correctly and remains local-only', () => {
+    const board = boardFromValues([
+      [9, 9, 5, 6, 9],
+      [1, 2, 3, 9, 1],
+      [9, 9, 9, 9, 2],
+      [9, 9, 9, 9, 3],
+    ]);
+
+    const result = resolveLocalCascades(
+      board,
+      [{ x: 0, y: 1 }, { x: 1, y: 1 }, { x: 2, y: 1 }],
+      defaultRuleSet,
+      fixedSpawnPolicy,
+      new SeededRng(11),
+    );
+
+    expect(result.steps).toHaveLength(2);
+    expect(result.steps.map((step) => step.depth)).toEqual([0, 1]);
+    expect(result.steps[1]?.removedValues).toEqual([4, 5, 6]);
+  });
+
+  test('multi-step local cascade tracks pivot and applies depth scoring', () => {
+    const board = boardFromValues([
+      [1, 9, 9, 9, 9],
+      [2, 9, 9, 9, 9],
+      [3, 9, 9, 9, 9],
+      [0, 5, 6, 8, 9],
+      [9, 9, 9, 9, 9],
+    ]);
+
+    const result = resolveLocalCascades(
+      board,
+      [{ x: 0, y: 0 }, { x: 0, y: 1 }, { x: 0, y: 2 }],
+      defaultRuleSet,
+      fixedSpawnPolicy,
+      new SeededRng(3),
+    );
+
+    expect(result.steps).toHaveLength(3);
+    expect(result.steps.map((step) => step.depth)).toEqual([0, 1, 2]);
+    expect(result.steps[0]?.pivot).toEqual({ x: 0, y: 3 });
+    expect(result.steps[1]?.pivot).toEqual({ x: 2, y: 3 });
+    expect(result.steps[2]?.pivot).toEqual({ x: 2, y: 3 });
+
+    expect(result.steps[0]?.scoreDelta).toBe(calculateStepScore([1, 2, 3], 0, defaultRuleSet));
+    expect(result.steps[1]?.scoreDelta).toBe(calculateStepScore([4, 5, 6], 1, defaultRuleSet));
+    expect(result.steps[2]?.scoreDelta).toBe(calculateStepScore([7, 8, 9], 2, defaultRuleSet));
+  });
+
+  test('same seed and initial move produce deterministic cascade sequence', () => {
+    const board = boardFromValues([
+      [1, 9, 9, 9, 9],
+      [2, 9, 9, 9, 9],
+      [3, 9, 9, 9, 9],
+      [0, 5, 6, 8, 9],
+      [9, 9, 9, 9, 9],
+    ]);
+    const initialPath = [{ x: 0, y: 0 }, { x: 0, y: 1 }, { x: 0, y: 2 }];
+
+    const a = resolveLocalCascades(board, initialPath, defaultRuleSet, fixedSpawnPolicy, new SeededRng(99));
+    const b = resolveLocalCascades(board, initialPath, defaultRuleSet, fixedSpawnPolicy, new SeededRng(99));
+
+    expect(a).toEqual(b);
   });
 });

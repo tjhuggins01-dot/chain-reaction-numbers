@@ -89,37 +89,61 @@ export function findLocalCascadePath(board: BoardState, pivot: Position, rules: 
   const pivotTile = getTile(board, pivot);
   if (!pivotTile || pivotTile.value <= 0 || pivotTile.value > rules.maxTileValue) return null;
 
-  interface Step {
-    pos: Position;
-    path: Position[];
-    seen: Set<string>;
-  }
+  const orderedNeighbors = (pos: Position): Position[] =>
+    neighbors(board, pos).sort((a, b) => (a.x - b.x) || (a.y - b.y));
 
-  const stack: Step[] = [{ pos: pivot, path: [pivot], seen: new Set([positionKey(pivot)]) }];
+  const lexCompare = (a: Position[], b: Position[]): number => {
+    for (let i = 0; i < a.length; i += 1) {
+      if (a[i].x !== b[i].x) return a[i].x - b[i].x;
+      if (a[i].y !== b[i].y) return a[i].y - b[i].y;
+    }
+    return 0;
+  };
 
-  while (stack.length > 0) {
-    const step = stack.pop();
-    if (!step) break;
-    const tile = getTile(board, step.pos);
-    if (!tile) continue;
+  const isBetter = (candidate: Position[], currentBest: Position[] | null): boolean => {
+    if (!currentBest) return true;
+    if (candidate.length !== currentBest.length) return candidate.length > currentBest.length;
 
-    if (step.path.length >= rules.minChainLength) {
-      const reversed = [...step.path].reverse();
-      return reversed;
+    const candidateEndpoint = getTile(board, candidate[candidate.length - 1])?.value ?? 0;
+    const bestEndpoint = getTile(board, currentBest[currentBest.length - 1])?.value ?? 0;
+    if (candidateEndpoint !== bestEndpoint) return candidateEndpoint > bestEndpoint;
+
+    return lexCompare(candidate, currentBest) < 0;
+  };
+
+  const pivotKey = positionKey(pivot);
+  let best: Position[] | null = null;
+
+  const search = (current: Position, seen: Set<string>, path: Position[], hasPivot: boolean): void => {
+    const currentTile = getTile(board, current);
+    if (!currentTile || currentTile.value <= 0 || currentTile.value > rules.maxTileValue) return;
+
+    if (hasPivot && path.length >= rules.minChainLength && isBetter(path, best)) {
+      best = [...path];
     }
 
-    for (const next of neighbors(board, step.pos)) {
-      const key = positionKey(next);
-      if (step.seen.has(key)) continue;
+    for (const next of orderedNeighbors(current)) {
+      const nextKey = positionKey(next);
+      if (seen.has(nextKey)) continue;
       const nextTile = getTile(board, next);
-      if (!nextTile || nextTile.value !== tile.value - 1) continue;
-      stack.push({
-        pos: next,
-        path: [...step.path, next],
-        seen: new Set([...step.seen, key]),
-      });
+      if (!nextTile || nextTile.value !== currentTile.value + 1) continue;
+      seen.add(nextKey);
+      path.push(next);
+      search(next, seen, path, hasPivot || positionKey(next) === pivotKey);
+      path.pop();
+      seen.delete(nextKey);
+    }
+  };
+
+  for (let y = 0; y < board.height; y += 1) {
+    for (let x = 0; x < board.width; x += 1) {
+      const start = { x, y };
+      const tile = getTile(board, start);
+      if (!tile || tile.value <= 0 || tile.value > rules.maxTileValue) continue;
+      const startKey = positionKey(start);
+      search(start, new Set([startKey]), [start], startKey === pivotKey);
     }
   }
 
-  return null;
+  return best;
 }
