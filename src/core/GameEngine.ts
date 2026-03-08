@@ -91,12 +91,14 @@ export class GameEngine {
           events.push({
             type: 'ChainResolved',
             removedValues: step.removedValues,
+            removedPositions: step.removedPositions,
             upgradedValue: step.upgradedValue,
+            upgradedPosition: step.pivot,
             cascadeDepth: step.depth,
           });
           if (step.depth > 0) events.push({ type: 'CascadeTriggered', depth: step.depth });
-          events.push({ type: 'GravityApplied' });
-          events.push({ type: 'BoardRefilled' });
+          events.push({ type: 'GravityApplied', cascadeDepth: step.depth });
+          events.push({ type: 'BoardRefilled', board: step.board, cascadeDepth: step.depth });
         }
         this.state.score += totalDelta;
         events.push({ type: 'ScoreChanged', score: this.state.score, delta: totalDelta });

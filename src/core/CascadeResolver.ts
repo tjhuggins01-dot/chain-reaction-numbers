@@ -13,6 +13,7 @@ export interface CascadeStep {
   scoreDelta: number;
   depth: number;
   removedValues: number[];
+  removedPositions: Position[];
   upgradedValue: number;
   pivot: Position;
 }
@@ -80,6 +81,7 @@ export function resolveLocalCascades(
       scoreDelta: resolved.score,
       depth,
       removedValues: resolved.removedValues,
+      removedPositions: currentPath.map((pos) => ({ ...pos })),
       upgradedValue: resolved.upgradedValue,
       pivot: resolvedPivot,
     });
