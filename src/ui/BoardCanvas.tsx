@@ -8,6 +8,7 @@ interface Props {
   board: BoardState;
   previousBoard: BoardState | null;
   fallProgress: number;
+  popProgress: number;
   minPathLength: number;
   inputEnabled: boolean;
   selectedPath: Position[];
@@ -32,10 +33,15 @@ function key(pos: Position): string {
   return `${pos.x},${pos.y}`;
 }
 
+function getViewportWidth(): number {
+  return Math.floor((window.visualViewport?.width ?? window.innerWidth) - horizontalBoundary);
+}
+
 export function BoardCanvas({
   board,
   previousBoard,
   fallProgress,
+  popProgress,
   minPathLength,
   inputEnabled,
   selectedPath,
@@ -44,6 +50,7 @@ export function BoardCanvas({
   onPathChange,
   onCommit,
 }: Props): JSX.Element {
+  const containerRef = useRef<HTMLDivElement | null>(null);
   const ref = useRef<HTMLCanvasElement | null>(null);
   const [dragging, setDragging] = useState(false);
   const [displaySize, setDisplaySize] = useState(maxCanvasSize);
@@ -60,16 +67,24 @@ export function BoardCanvas({
 
   useEffect(() => {
     const updateSize = () => {
-      const viewportWidth = Math.floor(window.innerWidth - horizontalBoundary);
+      const viewportWidth = getViewportWidth();
       const viewportHeight = Math.floor(window.innerHeight - reservedVerticalSpace - verticalBoundary);
-      const next = Math.min(maxCanvasSize, viewportWidth, viewportHeight);
-      const minimumSafeSize = Math.min(minCanvasSize, viewportWidth);
+      const containerWidth = Math.floor((containerRef.current?.clientWidth ?? viewportWidth) - horizontalBoundary);
+      const usableWidth = Math.min(viewportWidth, containerWidth);
+      const next = Math.min(maxCanvasSize, usableWidth, viewportHeight);
+      const minimumSafeSize = Math.min(minCanvasSize, usableWidth);
       setDisplaySize(Math.max(minimumSafeSize, next));
     };
 
     updateSize();
     window.addEventListener('resize', updateSize);
-    return () => window.removeEventListener('resize', updateSize);
+    const observer = new ResizeObserver(updateSize);
+    if (containerRef.current) observer.observe(containerRef.current);
+
+    return () => {
+      window.removeEventListener('resize', updateSize);
+      observer.disconnect();
+    };
   }, []);
 
   useEffect(() => {
@@ -130,8 +145,8 @@ export function BoardCanvas({
             }
           }
 
-          const removeScale = isRemoving ? Math.max(0, 1 - fallProgress) : 1;
-          const upgradedBoost = isUpgraded ? 1 + Math.max(0, 0.25 * (1 - fallProgress)) : 1;
+          const removeScale = isRemoving ? Math.max(0.1, 1 - popProgress * 0.9) : 1;
+          const upgradedBoost = isUpgraded ? 1 + Math.max(0, 0.2 * (1 - popProgress)) : 1;
           const radius = Math.min(cellW, cellH) * 0.33 * removeScale * upgradedBoost;
 
           ctx.fillStyle = colorForValue(tile.value);
@@ -203,7 +218,7 @@ export function BoardCanvas({
         ctx.fillText(String(index + 1), cx, cy);
       });
     }
-  }, [board, displaySize, selectedPath, selectedSet, previousBoard, fallProgress, removingSet, upgradedCell, invalidCell]);
+  }, [board, displaySize, selectedPath, selectedSet, previousBoard, fallProgress, popProgress, removingSet, upgradedCell, invalidCell]);
 
   function pointerToCell(e: PointerEvent<HTMLCanvasElement>): Position | null {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -237,12 +252,13 @@ export function BoardCanvas({
   }, [inputEnabled, onPathChange]);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', paddingInline: horizontalBoundary / 2, boxSizing: 'border-box' }}>
+    <div ref={containerRef} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%', paddingInline: horizontalBoundary / 2, boxSizing: 'border-box' }}>
       <canvas
         ref={ref}
         style={{
           width: displaySize,
           height: displaySize,
+          maxWidth: '100%',
           border: '2px solid #64748b',
           borderRadius: 8,
           touchAction: 'none',
