@@ -131,7 +131,9 @@ function runSimulation(seed: number, options: SimulationOptions): RunSummary {
 
     cascadeDepthTotal += cascades.length === 0 ? 0 : Math.max(...cascades);
 
-    const scoreChanged = events.find((event): event is { type: 'ScoreChanged'; score: number } => event.type === 'ScoreChanged');
+    const scoreChanged = events.find(
+      (event): event is Extract<(typeof events)[number], { type: 'ScoreChanged' }> => event.type === 'ScoreChanged',
+    );
     score = scoreChanged?.score ?? engine.getState().score;
 
     turns += 1;
