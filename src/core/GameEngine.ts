@@ -131,10 +131,10 @@ export class GameEngine {
     this.rng = new SeededRng(seed);
     const emptyBoard = buildEmptyBoard(this.state.rules);
 
-    let generated = refillBoard(emptyBoard, this.state.rules, this.spawnPolicy, this.rng, 'start');
+    let generated = refillBoard(emptyBoard, this.state.rules, this.spawnPolicy, this.rng, 'start', 'start');
     let attempts = 0;
     while (!hasAnyValidMove(generated, this.state.rules) && attempts < 100) {
-      generated = refillBoard(emptyBoard, this.state.rules, this.spawnPolicy, this.rng, 'start');
+      generated = refillBoard(emptyBoard, this.state.rules, this.spawnPolicy, this.rng, 'start', 'start');
       attempts += 1;
     }
 

@@ -25,21 +25,24 @@ export function boardValues(board: BoardState): number[][] {
 }
 
 export function makeDeterministicRuleSet(board: { width: number; height: number }): RuleSet {
+  const deterministicWeights = {
+    1: 100,
+    2: 0,
+    3: 0,
+    4: 0,
+    5: 0,
+    6: 0,
+    7: 0,
+    8: 0,
+    9: 0,
+    10: 0,
+  };
+
   return {
     ...defaultRuleSet,
     board,
-    spawnWeights: {
-      1: 100,
-      2: 0,
-      3: 0,
-      4: 0,
-      5: 0,
-      6: 0,
-      7: 0,
-      8: 0,
-      9: 0,
-      10: 0,
-    },
+    startingSpawnWeights: deterministicWeights,
+    refillSpawnWeights: deterministicWeights,
   };
 }
 

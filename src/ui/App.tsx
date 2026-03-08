@@ -9,6 +9,7 @@ import { DebugPanel } from './DebugPanel';
 import { shouldCommitPath } from '../app/UiGuards';
 import type { BoardState } from '../core/BoardState';
 import type { EngineEvent } from '../core/EngineEvent';
+import { countPlayableStarts } from '../core/MoveScanner';
 
 const STEP_POP_MS = 220;
 const STEP_FALL_MS = 340;
@@ -179,6 +180,7 @@ export function App(): JSX.Element {
         <DebugPanel
           seed={engineState.seed}
           replay={session.engine.getReplayLog()}
+          availableStarts={countPlayableStarts(engineState.board, engineState.rules)}
           onResetSameSeed={() => resetRun(true)}
           onResetNewSeed={() => resetRun(false)}
         />

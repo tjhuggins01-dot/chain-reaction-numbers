@@ -7,7 +7,7 @@ import { refillBoard } from '../src/core/RefillResolver';
 import { SeededRng } from '../src/core/Rng';
 import { WeightedSpawnPolicy } from '../src/core/SpawnPolicy';
 import { calculateStepScore } from '../src/core/Scoring';
-import { findAnyValidPath, findLocalCascadePath, hasAnyValidMove } from '../src/core/MoveScanner';
+import { countPlayableStarts, findAnyValidPath, findBestValidPath, findLocalCascadePath, hasAnyValidMove } from '../src/core/MoveScanner';
 import { GameEngine } from '../src/core/GameEngine';
 import { endlessMode } from '../src/modes/EndlessMode';
 import { resolveLocalCascades } from '../src/core/CascadeResolver';
@@ -196,6 +196,59 @@ describe('engine behavior', () => {
       { x: 0, y: 1 },
       { x: 0, y: 0 },
     ]);
+  });
+});
+
+
+
+describe('simulation helpers', () => {
+  test('best-path selector prefers longer chains with deterministic tie-breaks', () => {
+    const board = boardFromValues([
+      [1, 2, 3, 4],
+      [2, 3, 4, 5],
+      [7, 8, 9, 9],
+      [9, 9, 9, 9],
+    ]);
+
+    expect(findBestValidPath(board, defaultRuleSet)).toEqual([
+      { x: 0, y: 0 },
+      { x: 1, y: 0 },
+      { x: 2, y: 0 },
+      { x: 3, y: 0 },
+      { x: 3, y: 1 },
+    ]);
+  });
+
+  test('countPlayableStarts reports how many starts have at least one valid chain', () => {
+    const board = boardFromValues([
+      [1, 2, 3],
+      [2, 3, 4],
+      [8, 8, 8],
+    ]);
+
+    expect(countPlayableStarts(board, defaultRuleSet)).toBe(3);
+  });
+});
+
+describe('spawn balance tuning', () => {
+  test('board-health refill weights apply when low-value congestion is extreme', () => {
+    const rules = {
+      ...defaultRuleSet,
+      refillSpawnWeights: { 1: 100, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0, 10: 0 },
+      boardHealthSpawnTuning: {
+        lowValueThreshold: 3,
+        lowValueRatioTrigger: 0.5,
+        refillSpawnWeightsWhenClogged: { 1: 0, 2: 0, 3: 0, 4: 100, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0, 10: 0 },
+      },
+    };
+    const board = boardFromValues([
+      [1, 1],
+      [0, 0],
+    ]);
+
+    const out = refillBoard(board, rules, new WeightedSpawnPolicy(), new SeededRng(2), 'tile', 'refill');
+    expect(out.tiles[1][0].value).toBe(4);
+    expect(out.tiles[1][1].value).toBe(4);
   });
 });
 
