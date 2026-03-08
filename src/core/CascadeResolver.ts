@@ -17,12 +17,21 @@ export interface CascadeStep {
   pivot: Position;
 }
 
+function findTilePositionById(board: BoardState, tileId: string): Position | null {
+  for (let y = 0; y < board.height; y += 1) {
+    for (let x = 0; x < board.width; x += 1) {
+      if (board.tiles[y][x].id === tileId) return { x, y };
+    }
+  }
+  return null;
+}
+
 function resolveSingle(
   board: BoardState,
   path: Position[],
   rules: RuleSet,
   depth: number,
-): { board: BoardState; score: number; pivot: Position; removedValues: number[]; upgradedValue: number } {
+): { board: BoardState; score: number; pivot: Position; upgradedTileId: string; removedValues: number[]; upgradedValue: number } {
   const values: number[] = [];
   const pivot = path[path.length - 1];
   const tiles = board.tiles.map((row) => row.map((t) => ({ ...t, position: { ...t.position }, effects: [...t.effects] })));
@@ -35,8 +44,9 @@ function resolveSingle(
   }
 
   const lastValue = values[values.length - 1] ?? 1;
+  const upgradedTileId = `upgraded-${pivot.x}-${pivot.y}-${depth}`;
   tiles[pivot.y][pivot.x] = {
-    id: `upgraded-${pivot.x}-${pivot.y}-${depth}`,
+    id: upgradedTileId,
     value: Math.min(lastValue + 1, rules.maxTileValue),
     effects: [],
     position: { ...pivot },
@@ -44,7 +54,7 @@ function resolveSingle(
   const upgradedValue = tiles[pivot.y][pivot.x].value;
 
   const score = calculateStepScore(values, depth, rules);
-  return { board: { width: board.width, height: board.height, tiles }, score, pivot, removedValues: values, upgradedValue };
+  return { board: { width: board.width, height: board.height, tiles }, score, pivot, upgradedTileId, removedValues: values, upgradedValue };
 }
 
 export function resolveLocalCascades(
@@ -64,16 +74,17 @@ export function resolveLocalCascades(
     const resolved = resolveSingle(currentBoard, currentPath, rules, depth);
     currentBoard = applyGravity(resolved.board);
     currentBoard = refillBoard(currentBoard, rules, spawnPolicy, rng);
+    const resolvedPivot = findTilePositionById(currentBoard, resolved.upgradedTileId) ?? resolved.pivot;
     steps.push({
       board: currentBoard,
       scoreDelta: resolved.score,
       depth,
       removedValues: resolved.removedValues,
       upgradedValue: resolved.upgradedValue,
-      pivot: resolved.pivot,
+      pivot: resolvedPivot,
     });
 
-    pivot = resolved.pivot;
+    pivot = resolvedPivot;
     currentPath = findLocalCascadePath(currentBoard, pivot, rules);
     depth += 1;
   }
