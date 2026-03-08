@@ -12,6 +12,7 @@ function assertAscending(board: BoardState, prev: Position, next: Position): boo
   const prevTile = getTile(board, prev);
   const nextTile = getTile(board, next);
   if (!prevTile || !nextTile) return false;
+  if (prevTile.value <= 0 || nextTile.value <= 0) return false;
   return nextTile.value === prevTile.value + 1;
 }
 
@@ -22,7 +23,8 @@ export function validatePath(board: BoardState, path: Path, rules: RuleSet): Pat
   for (let i = 0; i < path.length; i += 1) {
     const pos = path[i];
     if (!inBounds(board, pos)) return { valid: false, reason: 'out_of_bounds' };
-    if (!getTile(board, pos)) return { valid: false, reason: 'missing_tile' };
+    const tile = getTile(board, pos);
+    if (!tile || tile.value <= 0 || tile.value > rules.maxTileValue) return { valid: false, reason: 'missing_tile' };
     const key = positionKey(pos);
     if (seen.has(key)) return { valid: false, reason: 'repeated' };
     seen.add(key);

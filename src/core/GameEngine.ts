@@ -8,6 +8,7 @@ import { WeightedSpawnPolicy } from './SpawnPolicy';
 import { validatePath } from './PathValidator';
 import { refillBoard } from './RefillResolver';
 import { resolveLocalCascades } from './CascadeResolver';
+import { hasAnyValidMove } from './MoveScanner';
 import type { GameMode } from './GameMode';
 
 function buildEmptyBoard(rules: RuleSet) {
@@ -126,7 +127,15 @@ export class GameEngine {
     this.state.seed = seed;
     this.rng = new SeededRng(seed);
     const emptyBoard = buildEmptyBoard(this.state.rules);
-    this.state.board = refillBoard(emptyBoard, this.state.rules, this.spawnPolicy, this.rng, 'start');
+
+    let generated = refillBoard(emptyBoard, this.state.rules, this.spawnPolicy, this.rng, 'start');
+    let attempts = 0;
+    while (!hasAnyValidMove(generated, this.state.rules) && attempts < 100) {
+      generated = refillBoard(emptyBoard, this.state.rules, this.spawnPolicy, this.rng, 'start');
+      attempts += 1;
+    }
+
+    this.state.board = generated;
     this.state.score = 0;
     this.state.runActive = true;
     this.state.cascadeDepth = 0;
