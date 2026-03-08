@@ -137,7 +137,8 @@ describe('engine integration and regression safety', () => {
     const rules = {
       ...makeDeterministicRuleSet({ width: 3, height: 3 }),
       maxTileValue: 3,
-      spawnWeights: { 1: 0, 2: 0, 3: 100 },
+      startingSpawnWeights: { 1: 0, 2: 0, 3: 100 },
+      refillSpawnWeights: { 1: 0, 2: 0, 3: 100 },
     };
     const board = boardFromValues([
       [1, 2, 3],
