@@ -135,19 +135,23 @@ export function BoardCanvas({
         if (tile.value > 0) {
           let drawX = left + cellW / 2;
           let drawY = top + cellH / 2;
-          if (fallProgress < 1) {
-            const prev = prevById.get(tile.id);
-            if (prev) {
-              const startX = prev.x * cellW + cellW / 2;
-              const startY = prev.y * cellH + cellH / 2;
-              drawX = startX + (drawX - startX) * fallProgress;
-              drawY = startY + (drawY - startY) * fallProgress;
-            }
+          const prev = prevById.get(tile.id);
+          if (fallProgress < 1 && prev) {
+            const startX = prev.x * cellW + cellW / 2;
+            const startY = prev.y * cellH + cellH / 2;
+            drawX = startX + (drawX - startX) * fallProgress;
+            drawY = startY + (drawY - startY) * fallProgress;
           }
 
           const removeScale = isRemoving ? Math.max(0.1, 1 - popProgress * 0.9) : 1;
           const upgradedBoost = isUpgraded ? 1 + Math.max(0, 0.2 * (1 - popProgress)) : 1;
           const radius = Math.min(cellW, cellH) * 0.33 * removeScale * upgradedBoost;
+          const isSpawnedDuringFall = Boolean(previousBoard) && fallProgress < 1 && !prev;
+
+          ctx.save();
+          if (isSpawnedDuringFall) {
+            ctx.globalAlpha = Math.max(0.12, fallProgress);
+          }
 
           ctx.fillStyle = colorForValue(tile.value);
           ctx.beginPath();
@@ -167,6 +171,7 @@ export function BoardCanvas({
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
           ctx.fillText(String(tile.value), drawX, drawY);
+          ctx.restore();
         }
       }
     }

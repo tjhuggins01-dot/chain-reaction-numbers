@@ -10,9 +10,9 @@ import { shouldCommitPath } from '../app/UiGuards';
 import type { BoardState } from '../core/BoardState';
 import type { EngineEvent } from '../core/EngineEvent';
 
-const STEP_POP_MS = 180;
-const STEP_FALL_MS = 280;
-const STEP_BETWEEN_MS = 80;
+const STEP_POP_MS = 220;
+const STEP_FALL_MS = 340;
+const STEP_BETWEEN_MS = 110;
 const SCORE_DELTA_MS = 1400;
 const CASCADE_HINT_MS = 1200;
 
