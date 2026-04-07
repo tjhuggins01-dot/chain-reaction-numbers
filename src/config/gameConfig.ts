@@ -44,6 +44,31 @@ export const defaultRuleSet: RuleSet = {
       10: 0,
     },
   },
+  bridgeScarcityTuning: {
+    enabled: true,
+    monitorValues: [2, 3, 4],
+    zeroCountBoost: {
+      2: 2.0,
+      3: 1.9,
+      4: 1.2,
+    },
+    lowCountBoost: {
+      2: 1.35,
+      3: 1.3,
+    },
+    suppressionWhenMissing: {
+      2: {
+        1: 0.7,
+        3: 0.8,
+      },
+      3: {
+        2: 0.75,
+        4: 0.9,
+      },
+    },
+    maxMultiplier: 2.5,
+    minMultiplierRatio: 0.1,
+  },
   scoring: {
     lengthMultiplierStep: 0.2,
     cascadeMultiplierBase: 1.1,
