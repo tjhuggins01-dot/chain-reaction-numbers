@@ -59,29 +59,45 @@ function selectWeights(rules: RuleSet, context: SpawnContext): SpawnWeights {
     adjustedWeights[value] = (adjustedWeights[value] ?? 0) * factor;
   };
 
-  const c2 = counts[2] ?? 0;
-  const c3 = counts[3] ?? 0;
-  const c4 = counts[4] ?? 0;
+  const bridgeScarcityTuning = rules.bridgeScarcityTuning;
+  if (bridgeScarcityTuning?.enabled) {
+    const monitorValues = bridgeScarcityTuning.monitorValues ?? [2, 3, 4];
+    for (const monitoredValue of monitorValues) {
+      const count = counts[monitoredValue] ?? 0;
+      if (count === 0) {
+        const zeroCountBoost = bridgeScarcityTuning.zeroCountBoost[monitoredValue];
+        if (zeroCountBoost !== undefined) {
+          multiplyWeight(monitoredValue, zeroCountBoost);
+        }
+        const suppression = bridgeScarcityTuning.suppressionWhenMissing[monitoredValue];
+        if (suppression) {
+          for (const [targetValueText, factor] of Object.entries(suppression)) {
+            const targetValue = Number(targetValueText);
+            multiplyWeight(targetValue, factor);
+          }
+        }
+      } else if (count === 1) {
+        const lowCountBoost = bridgeScarcityTuning.lowCountBoost[monitoredValue];
+        if (lowCountBoost !== undefined) {
+          multiplyWeight(monitoredValue, lowCountBoost);
+        }
+      }
+    }
 
-  if (c2 === 0) {
-    multiplyWeight(2, 2.0);
-    multiplyWeight(1, 0.7);
-    multiplyWeight(3, 0.8);
-  } else if (c2 === 1) {
-    multiplyWeight(2, 1.35);
+    const c4 = counts[4] ?? 0;
+    const c3 = counts[3] ?? 0;
+    if (c4 === 0 && c3 > 1) {
+      const zeroCountBoost4 = bridgeScarcityTuning.zeroCountBoost[4];
+      if (zeroCountBoost4 !== undefined && zeroCountBoost4 !== 0) {
+        multiplyWeight(4, 1 / zeroCountBoost4);
+      }
+    }
   }
 
-  if (c3 === 0) {
-    multiplyWeight(3, 1.9);
-    multiplyWeight(2, 0.75);
-    multiplyWeight(4, 0.9);
-  } else if (c3 === 1) {
-    multiplyWeight(3, 1.3);
-  }
-
-  if (c4 === 0 && c3 <= 1) {
-    multiplyWeight(4, 1.2);
-  }
+  const maxMultiplier = bridgeScarcityTuning?.enabled ? bridgeScarcityTuning.maxMultiplier : 2.5;
+  const minMultiplierRatio = bridgeScarcityTuning?.enabled
+    ? bridgeScarcityTuning.minMultiplierRatio
+    : 0.1;
 
   for (let value = 1; value <= rules.maxTileValue; value += 1) {
     const baseWeight = baseWeights[value] ?? 0;
@@ -89,8 +105,8 @@ function selectWeights(rules: RuleSet, context: SpawnContext): SpawnWeights {
       adjustedWeights[value] = 0;
       continue;
     }
-    const minWeight = 0.1 * baseWeight;
-    const maxWeight = 2.5 * baseWeight;
+    const minWeight = minMultiplierRatio * baseWeight;
+    const maxWeight = maxMultiplier * baseWeight;
     const adjusted = adjustedWeights[value] ?? 0;
     adjustedWeights[value] = Math.min(maxWeight, Math.max(minWeight, adjusted));
   }
