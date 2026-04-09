@@ -10,6 +10,7 @@ interface SimulationOptions {
   baseSeed: number;
   maxTurns: number;
   agent: 'first' | 'longest';
+  compareBridgeScarcity: boolean;
 }
 
 interface RunSummary {
@@ -53,6 +54,7 @@ function parseArgs(): SimulationOptions {
     baseSeed: Math.max(1, Math.floor(getNumber('--seed', 1000))),
     maxTurns: Math.max(1, Math.floor(getNumber('--max-turns', 300))),
     agent: getAgent(),
+    compareBridgeScarcity: args.includes('--compare-bridge-scarcity'),
   };
 }
 
@@ -92,8 +94,8 @@ function mergeHistogram(into: Record<number, number>, sample: Record<number, num
   }
 }
 
-function runSimulation(seed: number, options: SimulationOptions): RunSummary {
-  const engine = GameEngine.create(seed, defaultRuleSet, endlessMode);
+function runSimulation(seed: number, options: SimulationOptions, rules = defaultRuleSet): RunSummary {
+  const engine = GameEngine.create(seed, rules, endlessMode);
   engine.dispatch({ type: 'StartRun' });
 
   let turns = 0;
@@ -188,7 +190,8 @@ function percentile(values: number[], p: number): number {
 
 function main(): void {
   const options = parseArgs();
-  const runs = Array.from({ length: options.runs }, (_, i) => runSimulation(options.baseSeed + i, options));
+  const ruleset = defaultRuleSet;
+  const runs = Array.from({ length: options.runs }, (_, i) => runSimulation(options.baseSeed + i, options, ruleset));
 
   const avg = (selector: (run: RunSummary) => number): number => runs.reduce((sum, run) => sum + selector(run), 0) / runs.length;
   const totalBoardSamples = runs.reduce((sum, run) => sum + run.boardSamples, 0);
@@ -241,6 +244,45 @@ function main(): void {
       deadBoard: run.deadBoard,
     })),
   };
+
+  if (options.compareBridgeScarcity) {
+    const baselineRules = {
+      ...defaultRuleSet,
+      bridgeScarcityTuning: defaultRuleSet.bridgeScarcityTuning
+        ? { ...defaultRuleSet.bridgeScarcityTuning, enabled: false }
+        : undefined,
+    };
+    const baselineRuns = Array.from({ length: options.runs }, (_, i) =>
+      runSimulation(options.baseSeed + i, options, baselineRules),
+    );
+    const baselineAvg = (selector: (run: RunSummary) => number): number =>
+      baselineRuns.reduce((sum, run) => sum + selector(run), 0) / baselineRuns.length;
+    const baselineBoardSamples = baselineRuns.reduce((sum, run) => sum + run.boardSamples, 0);
+    const baselineMissingBridgeTurnRate =
+      baselineBoardSamples > 0
+        ? baselineRuns.reduce((sum, run) => sum + run.missingBridgeTurns, 0) / baselineBoardSamples
+        : 0;
+
+    Object.assign(report, {
+      comparison: {
+        baselineWithoutBridgeScarcity: {
+          missingBridgeTurnRate: baselineMissingBridgeTurnRate,
+          avgPlayableStarts: baselineAvg((run) => run.playableStartsAvg),
+          avgRunLengthTurns: baselineAvg((run) => run.turns),
+        },
+        tunedBridgeScarcity: {
+          missingBridgeTurnRate: report.missingBridgeTurnRate,
+          avgPlayableStarts: report.avgPlayableStarts,
+          avgRunLengthTurns: report.avgRunLengthTurns,
+        },
+        deltaTunedMinusBaseline: {
+          missingBridgeTurnRate: report.missingBridgeTurnRate - baselineMissingBridgeTurnRate,
+          avgPlayableStarts: report.avgPlayableStarts - baselineAvg((run) => run.playableStartsAvg),
+          avgRunLengthTurns: report.avgRunLengthTurns - baselineAvg((run) => run.turns),
+        },
+      },
+    });
+  }
 
   console.log(JSON.stringify(report, null, 2));
 }

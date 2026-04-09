@@ -11,7 +11,7 @@ export interface SpawnPolicy {
   nextValue(rng: Rng, rules: RuleSet, context: SpawnContext): number;
 }
 
-function selectWeights(rules: RuleSet, context: SpawnContext): SpawnWeights {
+export function computeSpawnWeights(rules: RuleSet, context: SpawnContext): SpawnWeights {
   if (context.phase === 'start') {
     return rules.startingSpawnWeights;
   }
@@ -62,6 +62,7 @@ function selectWeights(rules: RuleSet, context: SpawnContext): SpawnWeights {
   const bridgeScarcityTuning = rules.bridgeScarcityTuning;
   if (bridgeScarcityTuning?.enabled) {
     const monitorValues = bridgeScarcityTuning.monitorValues ?? [2, 3, 4];
+    const lowCountThreshold = Math.max(1, Math.floor(bridgeScarcityTuning.lowCountThreshold ?? 1));
     for (const monitoredValue of monitorValues) {
       const count = counts[monitoredValue] ?? 0;
       if (count === 0) {
@@ -71,12 +72,15 @@ function selectWeights(rules: RuleSet, context: SpawnContext): SpawnWeights {
         }
         const suppression = bridgeScarcityTuning.suppressionWhenMissing[monitoredValue];
         if (suppression) {
-          for (const [targetValueText, factor] of Object.entries(suppression)) {
+          const sortedSuppressionTargets = Object.entries(suppression).sort(
+            ([a], [b]) => Number(a) - Number(b),
+          );
+          for (const [targetValueText, factor] of sortedSuppressionTargets) {
             const targetValue = Number(targetValueText);
             multiplyWeight(targetValue, factor);
           }
         }
-      } else if (count === 1) {
+      } else if (count <= lowCountThreshold) {
         const lowCountBoost = bridgeScarcityTuning.lowCountBoost[monitoredValue];
         if (lowCountBoost !== undefined) {
           multiplyWeight(monitoredValue, lowCountBoost);
@@ -116,7 +120,7 @@ function selectWeights(rules: RuleSet, context: SpawnContext): SpawnWeights {
 
 export class WeightedSpawnPolicy implements SpawnPolicy {
   nextValue(rng: Rng, rules: RuleSet, context: SpawnContext): number {
-    const activeWeights = selectWeights(rules, context);
+    const activeWeights = computeSpawnWeights(rules, context);
     const entries = Object.entries(activeWeights)
       .map(([k, w]) => ({ value: Number(k), weight: w }))
       .filter((x) => x.weight > 0 && x.value >= 1 && x.value <= rules.maxTileValue)

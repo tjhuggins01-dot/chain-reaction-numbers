@@ -11,6 +11,7 @@ export interface BoardHealthSpawnTuning {
 export interface BridgeScarcityTuning {
   enabled: boolean;
   monitorValues?: number[];
+  lowCountThreshold?: number;
   zeroCountBoost: Record<number, number>;
   lowCountBoost: Record<number, number>;
   suppressionWhenMissing: Record<number, Record<number, number>>;

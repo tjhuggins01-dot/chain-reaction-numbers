@@ -5,7 +5,7 @@ import { boardFromValues } from './helpers';
 import { applyGravity } from '../src/core/GravityResolver';
 import { refillBoard } from '../src/core/RefillResolver';
 import { SeededRng } from '../src/core/Rng';
-import { WeightedSpawnPolicy } from '../src/core/SpawnPolicy';
+import { computeSpawnWeights, WeightedSpawnPolicy } from '../src/core/SpawnPolicy';
 import { calculateStepScore } from '../src/core/Scoring';
 import { countPlayableStarts, findAnyValidPath, findBestValidPath, findLocalCascadePath, hasAnyValidMove } from '../src/core/MoveScanner';
 import { GameEngine } from '../src/core/GameEngine';
@@ -347,6 +347,63 @@ describe('bridge scarcity refill adjustments', () => {
     const adjusted = refillBoard(board, adjustedRules, new WeightedSpawnPolicy(), new SeededRng(165));
 
     expect(adjusted.tiles[1][2].value).toBe(baseline.tiles[1][2].value);
+  });
+
+  test('low-count threshold increases 2-spawn frequency when bridge count is scarce but non-zero', () => {
+    const board = boardFromValues([
+      [2, 1],
+      [2, 0],
+    ]);
+    const baselineRules = makeBaselineRules({ 1: 10, 2: 1, 3: 0 });
+    const adjustedRules: RuleSet = {
+      ...baselineRules,
+      bridgeScarcityTuning: {
+        enabled: true,
+        monitorValues: [2],
+        lowCountThreshold: 2,
+        zeroCountBoost: { 2: 1 },
+        lowCountBoost: { 2: 15 },
+        suppressionWhenMissing: { 2: {} },
+        maxMultiplier: 100,
+        minMultiplierRatio: 0.01,
+      },
+    };
+
+    const samples = 200;
+    let baselineTwos = 0;
+    let adjustedTwos = 0;
+    for (let i = 0; i < samples; i += 1) {
+      const baseline = refillBoard(board, baselineRules, new WeightedSpawnPolicy(), new SeededRng(1000 + i));
+      const adjusted = refillBoard(board, adjustedRules, new WeightedSpawnPolicy(), new SeededRng(1000 + i));
+      if (baseline.tiles[1][1].value === 2) baselineTwos += 1;
+      if (adjusted.tiles[1][1].value === 2) adjustedTwos += 1;
+    }
+
+    expect(adjustedTwos).toBeGreaterThan(baselineTwos);
+  });
+
+  test('scarcity multipliers clamp to min and max ratios', () => {
+    const board = boardFromValues([
+      [1, 1],
+      [1, 0],
+    ]);
+    const rules: RuleSet = {
+      ...makeBaselineRules({ 1: 10, 2: 10, 3: 0 }),
+      bridgeScarcityTuning: {
+        enabled: true,
+        monitorValues: [2],
+        lowCountThreshold: 1,
+        zeroCountBoost: { 2: 1000 },
+        lowCountBoost: { 2: 1000 },
+        suppressionWhenMissing: { 2: { 1: 0.01 } },
+        maxMultiplier: 2,
+        minMultiplierRatio: 0.5,
+      },
+    };
+
+    const weights = computeSpawnWeights(rules, { phase: 'refill', board });
+    expect(weights[1]).toBe(5);
+    expect(weights[2]).toBe(20);
   });
 });
 
