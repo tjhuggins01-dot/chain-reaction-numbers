@@ -23,6 +23,10 @@ interface RunSummary {
   lowTileRatioPeak: number;
   lowTileCongestedTurns: number;
   lowMoveTurns: number;
+  missing2Turns: number;
+  missing3Turns: number;
+  missingBridgeTurns: number;
+  weakBridgeTurns: number;
   playableStartsAvg: number;
   tileHistogramSamples: Record<number, number>;
   boardSamples: number;
@@ -101,6 +105,10 @@ function runSimulation(seed: number, options: SimulationOptions): RunSummary {
   let lowTileRatioPeak = 0;
   let lowTileCongestedTurns = 0;
   let lowMoveTurns = 0;
+  let missing2Turns = 0;
+  let missing3Turns = 0;
+  let missingBridgeTurns = 0;
+  let weakBridgeTurns = 0;
   let playableStartsTotal = 0;
   const histogram: Record<number, number> = {};
 
@@ -115,7 +123,16 @@ function runSimulation(seed: number, options: SimulationOptions): RunSummary {
     lowTileRatioTotal += ratio;
     lowTileRatioPeak = Math.max(lowTileRatioPeak, ratio);
     if (ratio >= 0.72) lowTileCongestedTurns += 1;
-    mergeHistogram(histogram, tileHistogram(state.board));
+    const turnHistogram = tileHistogram(state.board);
+    mergeHistogram(histogram, turnHistogram);
+    const count2 = turnHistogram[2] ?? 0;
+    const count3 = turnHistogram[3] ?? 0;
+    const missing2 = count2 === 0;
+    const missing3 = count3 === 0;
+    if (missing2) missing2Turns += 1;
+    if (missing3) missing3Turns += 1;
+    if (missing2 || missing3) missingBridgeTurns += 1;
+    if (count2 <= 1 || count3 <= 1) weakBridgeTurns += 1;
 
     if (!hasAnyValidMove(state.board, state.rules)) break;
 
@@ -152,6 +169,10 @@ function runSimulation(seed: number, options: SimulationOptions): RunSummary {
     lowTileRatioPeak,
     lowTileCongestedTurns,
     lowMoveTurns,
+    missing2Turns,
+    missing3Turns,
+    missingBridgeTurns,
+    weakBridgeTurns,
     playableStartsAvg: boardSamples > 0 ? playableStartsTotal / boardSamples : 0,
     tileHistogramSamples: histogram,
     boardSamples,
@@ -198,6 +219,10 @@ function main(): void {
     avgPlayableStarts: avg((run) => run.playableStartsAvg),
     lowMoveTurnRate: totalBoardSamples > 0 ? runs.reduce((sum, run) => sum + run.lowMoveTurns, 0) / totalBoardSamples : 0,
     lowTileCongestionTurnRate: totalBoardSamples > 0 ? runs.reduce((sum, run) => sum + run.lowTileCongestedTurns, 0) / totalBoardSamples : 0,
+    missing2TurnRate: totalBoardSamples > 0 ? runs.reduce((sum, run) => sum + run.missing2Turns, 0) / totalBoardSamples : 0,
+    missing3TurnRate: totalBoardSamples > 0 ? runs.reduce((sum, run) => sum + run.missing3Turns, 0) / totalBoardSamples : 0,
+    missingBridgeTurnRate: totalBoardSamples > 0 ? runs.reduce((sum, run) => sum + run.missingBridgeTurns, 0) / totalBoardSamples : 0,
+    weakBridgeTurnRate: totalBoardSamples > 0 ? runs.reduce((sum, run) => sum + run.weakBridgeTurns, 0) / totalBoardSamples : 0,
     avgLowTileRatio: avg((run) => run.lowTileRatioAvg),
     avgPeakLowTileRatio: avg((run) => run.lowTileRatioPeak),
     scorePercentiles: {
