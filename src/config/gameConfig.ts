@@ -47,6 +47,7 @@ export const defaultRuleSet: RuleSet = {
   bridgeScarcityTuning: {
     enabled: true,
     monitorValues: [2, 3, 4],
+    lowCountThreshold: 1,
     zeroCountBoost: {
       2: 2.0,
       3: 1.9,
@@ -58,12 +59,12 @@ export const defaultRuleSet: RuleSet = {
     },
     suppressionWhenMissing: {
       2: {
-        1: 0.7,
-        3: 0.8,
+        1: 0.8,
+        3: 0.9,
       },
       3: {
-        2: 0.75,
-        4: 0.9,
+        2: 0.85,
+        4: 0.95,
       },
     },
     maxMultiplier: 2.5,
