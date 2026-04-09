@@ -11,6 +11,7 @@ import { countPlayableStarts, findAnyValidPath, findBestValidPath, findLocalCasc
 import { GameEngine } from '../src/core/GameEngine';
 import { endlessMode } from '../src/modes/EndlessMode';
 import { resolveLocalCascades } from '../src/core/CascadeResolver';
+import type { RuleSet } from '../src/core/RuleSet';
 
 const fixedSpawnPolicy = {
   nextValue: () => 10,
@@ -253,19 +254,31 @@ describe('spawn balance tuning', () => {
 });
 
 describe('bridge scarcity refill adjustments', () => {
+  function makeBaselineRules(refillSpawnWeights: RuleSet['refillSpawnWeights']): RuleSet {
+    return {
+      ...defaultRuleSet,
+      maxTileValue: 3,
+      boardHealthSpawnTuning: undefined,
+      refillSpawnWeights,
+      bridgeScarcityTuning: {
+        enabled: false,
+        monitorValues: [2, 3],
+        zeroCountBoost: { 2: 1, 3: 1 },
+        lowCountBoost: { 2: 1, 3: 1 },
+        suppressionWhenMissing: { 2: {}, 3: {} },
+        maxMultiplier: 100,
+        minMultiplierRatio: 0.01,
+      },
+    };
+  }
+
   test('missing 3s can still spawn 3 under deterministic refill despite 2-heavy baseline weights', () => {
     const board = boardFromValues([
       [2, 2],
       [2, 0],
     ]);
-    const baselineRules = {
-      ...defaultRuleSet,
-      maxTileValue: 3,
-      boardHealthSpawnTuning: undefined,
-      refillSpawnWeights: { 1: 0, 2: 1000, 3: 1 },
-      bridgeScarcityTuning: { ...defaultRuleSet.bridgeScarcityTuning, enabled: false },
-    };
-    const adjustedRules = {
+    const baselineRules = makeBaselineRules({ 1: 0, 2: 1000, 3: 1 });
+    const adjustedRules: RuleSet = {
       ...baselineRules,
       bridgeScarcityTuning: {
         enabled: true,
@@ -290,14 +303,8 @@ describe('bridge scarcity refill adjustments', () => {
       [1, 3],
       [1, 0],
     ]);
-    const baselineRules = {
-      ...defaultRuleSet,
-      maxTileValue: 3,
-      boardHealthSpawnTuning: undefined,
-      refillSpawnWeights: { 1: 10, 2: 9, 3: 0 },
-      bridgeScarcityTuning: { ...defaultRuleSet.bridgeScarcityTuning, enabled: false },
-    };
-    const adjustedRules = {
+    const baselineRules = makeBaselineRules({ 1: 10, 2: 9, 3: 0 });
+    const adjustedRules: RuleSet = {
       ...baselineRules,
       bridgeScarcityTuning: {
         enabled: true,
@@ -322,14 +329,8 @@ describe('bridge scarcity refill adjustments', () => {
       [2, 3, 2],
       [3, 1, 0],
     ]);
-    const baselineRules = {
-      ...defaultRuleSet,
-      maxTileValue: 3,
-      boardHealthSpawnTuning: undefined,
-      refillSpawnWeights: { 1: 10, 2: 9, 3: 0 },
-      bridgeScarcityTuning: { ...defaultRuleSet.bridgeScarcityTuning, enabled: false },
-    };
-    const adjustedRules = {
+    const baselineRules = makeBaselineRules({ 1: 10, 2: 9, 3: 0 });
+    const adjustedRules: RuleSet = {
       ...baselineRules,
       bridgeScarcityTuning: {
         enabled: true,
