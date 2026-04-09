@@ -11,6 +11,7 @@ import { countPlayableStarts, findAnyValidPath, findBestValidPath, findLocalCasc
 import { GameEngine } from '../src/core/GameEngine';
 import { endlessMode } from '../src/modes/EndlessMode';
 import { resolveLocalCascades } from '../src/core/CascadeResolver';
+import type { RuleSet } from '../src/core/RuleSet';
 
 const fixedSpawnPolicy = {
   nextValue: () => 10,
@@ -251,6 +252,104 @@ describe('spawn balance tuning', () => {
     expect(out.tiles[1][1].value).toBe(4);
   });
 });
+
+describe('bridge scarcity refill adjustments', () => {
+  function makeBaselineRules(refillSpawnWeights: RuleSet['refillSpawnWeights']): RuleSet {
+    return {
+      ...defaultRuleSet,
+      maxTileValue: 3,
+      boardHealthSpawnTuning: undefined,
+      refillSpawnWeights,
+      bridgeScarcityTuning: {
+        enabled: false,
+        monitorValues: [2, 3],
+        zeroCountBoost: { 2: 1, 3: 1 },
+        lowCountBoost: { 2: 1, 3: 1 },
+        suppressionWhenMissing: { 2: {}, 3: {} },
+        maxMultiplier: 100,
+        minMultiplierRatio: 0.01,
+      },
+    };
+  }
+
+  test('missing 3s can still spawn 3 under deterministic refill despite 2-heavy baseline weights', () => {
+    const board = boardFromValues([
+      [2, 2],
+      [2, 0],
+    ]);
+    const baselineRules = makeBaselineRules({ 1: 0, 2: 1000, 3: 1 });
+    const adjustedRules: RuleSet = {
+      ...baselineRules,
+      bridgeScarcityTuning: {
+        enabled: true,
+        monitorValues: [3],
+        zeroCountBoost: { 3: 500 },
+        lowCountBoost: {},
+        suppressionWhenMissing: {},
+        maxMultiplier: 1000,
+        minMultiplierRatio: 0,
+      },
+    };
+
+    const baseline = refillBoard(board, baselineRules, new WeightedSpawnPolicy(), new SeededRng(1327));
+    const adjusted = refillBoard(board, adjustedRules, new WeightedSpawnPolicy(), new SeededRng(1327));
+
+    expect(baseline.tiles[1][1].value).toBe(2);
+    expect(adjusted.tiles[1][1].value).toBe(3);
+  });
+
+  test('missing 2s boosts 2 and suppresses 1 relative to baseline under the same seed', () => {
+    const board = boardFromValues([
+      [1, 3],
+      [1, 0],
+    ]);
+    const baselineRules = makeBaselineRules({ 1: 10, 2: 9, 3: 0 });
+    const adjustedRules: RuleSet = {
+      ...baselineRules,
+      bridgeScarcityTuning: {
+        enabled: true,
+        monitorValues: [2],
+        zeroCountBoost: { 2: 10 },
+        lowCountBoost: {},
+        suppressionWhenMissing: { 2: { 1: 0.1 } },
+        maxMultiplier: 100,
+        minMultiplierRatio: 0.01,
+      },
+    };
+
+    const baseline = refillBoard(board, baselineRules, new WeightedSpawnPolicy(), new SeededRng(165));
+    const adjusted = refillBoard(board, adjustedRules, new WeightedSpawnPolicy(), new SeededRng(165));
+
+    expect(baseline.tiles[1][1].value).toBe(1);
+    expect(adjusted.tiles[1][1].value).toBe(2);
+  });
+
+  test('healthy bridge values produce identical refill results vs baseline under the same seed', () => {
+    const board = boardFromValues([
+      [2, 3, 2],
+      [3, 1, 0],
+    ]);
+    const baselineRules = makeBaselineRules({ 1: 10, 2: 9, 3: 0 });
+    const adjustedRules: RuleSet = {
+      ...baselineRules,
+      bridgeScarcityTuning: {
+        enabled: true,
+        monitorValues: [2, 3],
+        zeroCountBoost: { 2: 10, 3: 10 },
+        lowCountBoost: { 2: 5, 3: 5 },
+        suppressionWhenMissing: { 2: { 1: 0.1 }, 3: { 2: 0.1 } },
+        maxMultiplier: 100,
+        minMultiplierRatio: 0.01,
+      },
+    };
+
+    const baseline = refillBoard(board, baselineRules, new WeightedSpawnPolicy(), new SeededRng(165));
+    const adjusted = refillBoard(board, adjustedRules, new WeightedSpawnPolicy(), new SeededRng(165));
+
+    expect(adjusted.tiles[1][2].value).toBe(baseline.tiles[1][2].value);
+  });
+});
+
 
 describe('local cascade resolution', () => {
   test('does not cascade when no pivot-based follow-up exists', () => {
